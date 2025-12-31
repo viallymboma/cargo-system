@@ -45,7 +45,7 @@ export default function LoginPage() {
               <Package className="h-8 w-8 text-white" />
             </div>
           </Link>
-          <h2 className="text-3xl font-bold text-gray-900">Connexion à ShipTrack</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Connexion à DHL CARGO</h2>
           <p className="mt-2 text-gray-600">
             Entrez vos identifiants pour continuer
           </p>

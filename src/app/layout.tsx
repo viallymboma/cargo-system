@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ShipTrack - Logistics Management Platform",
+  title: "DHL CARGO - Logistics Management Platform",
   description: "Track and manage shipments from China to Cameroon",
 };
 

@@ -12,7 +12,7 @@ export default function Home() {
             <div className="rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 p-2">
               <Truck className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">ShipTrack</span>
+            <span className="text-xl font-bold text-gray-900">DHL CARGO</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login">
@@ -35,7 +35,7 @@ export default function Home() {
               </div>
             </div>
             <h1 className="mb-4 text-5xl font-bold text-gray-900">
-              ShipTrack
+              DHL CARGO
             </h1>
             <p className="mb-2 text-xl text-gray-600">
               Logistics Management Platform
@@ -63,7 +63,7 @@ export default function Home() {
         <section className="py-20">
           <div className="container mx-auto px-4">
             <h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
-              Why Choose ShipTrack?
+              Why Choose DHL CARGO?
             </h2>
             <div className="grid gap-8 md:grid-cols-3">
               <div className="rounded-lg border bg-white p-6 text-center shadow-sm">
@@ -107,7 +107,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t bg-gray-50 py-8">
         <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>&copy; 2024 ShipTrack. All rights reserved.</p>
+          <p>&copy; 2024 DHL CARGO. All rights reserved.</p>
         </div>
       </footer>
     </div>

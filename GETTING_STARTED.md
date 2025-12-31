@@ -1,4 +1,4 @@
-# 🚀 COMPLETE SETUP GUIDE - ShipTrack Frontend
+# 🚀 COMPLETE SETUP GUIDE - DHL CARGO Frontend
 
 ## 📋 What You Have Received
 
@@ -230,7 +230,7 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ShipTrack - Logistics Management Platform",
+  title: "DHL CARGO - Logistics Management Platform",
   description: "Track and manage shipments from China to Cameroon",
 };
 
@@ -264,7 +264,7 @@ export default function Home() {
           </div>
         </div>
         <h1 className="mb-4 text-5xl font-bold text-gray-900">
-          ShipTrack
+          DHL CARGO
         </h1>
         <p className="mb-8 text-xl text-gray-600">
           Logistics Management Platform
@@ -376,7 +376,7 @@ export default function LoginPage() {
               <Package className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h2 className="text-3xl font-bold">Sign in to ShipTrack</h2>
+          <h2 className="text-3xl font-bold">Sign in to DHL CARGO</h2>
           <p className="mt-2 text-gray-600">
             Enter your credentials to continue
           </p>
@@ -453,7 +453,7 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-gray-600">Welcome to ShipTrack</p>
+          <p className="text-gray-600">Welcome to DHL CARGO</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

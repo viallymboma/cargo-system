@@ -191,7 +191,7 @@ export const useNotificationStore = create<NotificationState>()(
         get().addNotification({
           type: "success",
           title: "Package Delivered",
-          message: `Package ${trackingNumber} has been delivered to ${receiverName}. Thank you for using ShipTrack!`,
+          message: `Package ${trackingNumber} has been delivered to ${receiverName}. Thank you for using DHL CARGO!`,
           channel: "whatsapp",
           shipmentId: trackingNumber,
         });

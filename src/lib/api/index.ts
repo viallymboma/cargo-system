@@ -36,7 +36,7 @@ export const shipmentsApi = _shipmentsApi;
 // Log which mode is active (only in development)
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   console.log(
-    `%c[ShipTrack] API Mode: ${config.USE_MOCK_API ? "MOCK (Simulated)" : "REAL (Backend)"}`,
+    `%c[DHL CARGO] API Mode: ${config.USE_MOCK_API ? "MOCK (Simulated)" : "REAL (Backend)"}`,
     `color: ${config.USE_MOCK_API ? "#f59e0b" : "#10b981"}; font-weight: bold;`
   );
 }

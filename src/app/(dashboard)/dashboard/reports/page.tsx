@@ -408,7 +408,7 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     <TableRow>
-                      <TableCell className="font-medium">ShipTrack Douala</TableCell>
+                      <TableCell className="font-medium">DHL CARGO Douala</TableCell>
                       <TableCell className="text-right">
                         {shipments.filter((s) => s.agencyId === "agency-1").length}
                       </TableCell>
@@ -421,7 +421,7 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="font-medium">ShipTrack Yaounde</TableCell>
+                      <TableCell className="font-medium">DHL CARGO Yaounde</TableCell>
                       <TableCell className="text-right">
                         {shipments.filter((s) => s.agencyId === "agency-2").length}
                       </TableCell>

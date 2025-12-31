@@ -63,7 +63,7 @@ const generateInvoiceNumber = (): string => {
 const initialAgencies: Agency[] = [
   {
     id: "agency-1",
-    name: "ShipTrack Douala",
+    name: "DHL CARGO Douala",
     code: "STD",
     address: "123 Port Avenue",
     city: "Douala",
@@ -76,7 +76,7 @@ const initialAgencies: Agency[] = [
   },
   {
     id: "agency-2",
-    name: "ShipTrack Yaounde",
+    name: "DHL CARGO Yaounde",
     code: "STY",
     address: "456 Central Street",
     city: "Yaounde",

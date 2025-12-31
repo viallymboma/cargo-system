@@ -75,7 +75,7 @@ export default function RegisterPage() {
           </Link>
           <h2 className="text-3xl font-bold text-gray-900">Créer un compte</h2>
           <p className="mt-2 text-gray-600">
-            Rejoignez ShipTrack pour gérer vos expéditions
+            Rejoignez DHL CARGO pour gérer vos expéditions
           </p>
         </div>
 
