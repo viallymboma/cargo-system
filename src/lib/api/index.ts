@@ -33,6 +33,48 @@ export const authApi = _authApi;
  */
 export const shipmentsApi = _shipmentsApi;
 
+/**
+ * Users API - For user and agency management
+ * Always uses real backend (no mock implementation)
+ */
+export { usersApi } from "./users";
+
+/**
+ * Warehouse API - For warehouse and inventory management
+ * Always uses real backend (no mock implementation)
+ */
+export { warehouseApi } from "./warehouse";
+
+/**
+ * Tracking API - For shipment tracking events
+ * Always uses real backend (no mock implementation)
+ */
+export { trackingApi } from "./tracking";
+
+/**
+ * Billing API - For invoices, payments, and tariffs
+ * Always uses real backend (no mock implementation)
+ */
+export { billingApi } from "./billing";
+
+/**
+ * Reports API - For analytics and reporting
+ * Always uses real backend (no mock implementation)
+ */
+export { reportsApi } from "./reports";
+
+/**
+ * Notifications API - For user notifications
+ * Always uses real backend (no mock implementation)
+ */
+export { notificationsApi } from "./notifications";
+
+/**
+ * Health API - For system health checks
+ * Always uses real backend (no mock implementation)
+ */
+export { healthApi } from "./health";
+
 // Log which mode is active (only in development)
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   console.log(

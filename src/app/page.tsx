@@ -16,10 +16,10 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login">
-              <Button variant="ghost">Login</Button>
+              <Button variant="ghost">Connexion</Button>
             </Link>
             <Link href="/login">
-              <Button>Get Started</Button>
+              <Button>Commencer</Button>
             </Link>
           </div>
         </div>
@@ -38,21 +38,21 @@ export default function Home() {
               DHL CARGO
             </h1>
             <p className="mb-2 text-xl text-gray-600">
-              Logistics Management Platform
+              Plateforme de Gestion Logistique
             </p>
             <p className="mb-8 text-lg text-gray-500">
-              Track and manage shipments from China to Cameroon
+              Suivez et gérez vos expéditions de la Chine au Cameroun
             </p>
             <div className="flex justify-center gap-4">
               <Link href="/login">
                 <Button size="lg" className="gap-2">
                   <MapPin className="h-5 w-5" />
-                  Track Shipment
+                  Suivre l'Expédition
                 </Button>
               </Link>
               <Link href="/dashboard">
                 <Button size="lg" variant="outline">
-                  Go to Dashboard
+                  Accéder au Tableau de Bord
                 </Button>
               </Link>
             </div>
@@ -63,7 +63,7 @@ export default function Home() {
         <section className="py-20">
           <div className="container mx-auto px-4">
             <h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
-              Why Choose DHL CARGO?
+              Pourquoi Choisir DHL CARGO ?
             </h2>
             <div className="grid gap-8 md:grid-cols-3">
               <div className="rounded-lg border bg-white p-6 text-center shadow-sm">
@@ -72,9 +72,9 @@ export default function Home() {
                     <MapPin className="h-6 w-6 text-blue-600" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold">Real-Time Tracking</h3>
+                <h3 className="mb-2 text-lg font-semibold">Suivi en Temps Réel</h3>
                 <p className="text-gray-600">
-                  Track your shipments in real-time from pickup to delivery
+                  Suivez vos expéditions en temps réel du ramassage à la livraison
                 </p>
               </div>
               <div className="rounded-lg border bg-white p-6 text-center shadow-sm">
@@ -83,9 +83,9 @@ export default function Home() {
                     <Truck className="h-6 w-6 text-purple-600" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold">Fast Delivery</h3>
+                <h3 className="mb-2 text-lg font-semibold">Livraison Rapide</h3>
                 <p className="text-gray-600">
-                  Air and sea freight options to meet your delivery needs
+                  Options de fret aérien et maritime pour répondre à vos besoins
                 </p>
               </div>
               <div className="rounded-lg border bg-white p-6 text-center shadow-sm">
@@ -94,9 +94,9 @@ export default function Home() {
                     <Shield className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold">Secure & Insured</h3>
+                <h3 className="mb-2 text-lg font-semibold">Sécurisé et Assuré</h3>
                 <p className="text-gray-600">
-                  Your packages are protected with comprehensive insurance
+                  Vos colis sont protégés par une assurance complète
                 </p>
               </div>
             </div>
@@ -107,7 +107,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t bg-gray-50 py-8">
         <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>&copy; 2024 DHL CARGO. All rights reserved.</p>
+          <p>&copy; 2024 DHL CARGO. Tous droits réservés.</p>
         </div>
       </footer>
     </div>

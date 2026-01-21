@@ -369,19 +369,19 @@ const initialTrackingEvents: TrackingEvent[] = [
     id: "event-1-3",
     shipmentId: "shipment-1",
     type: "status_change" as TrackingEventType,
-    status: "picked_up" as ShipmentStatus,
-    location: { city: "Guangzhou", country: "China" },
-    description: "Package picked up from sender",
+    status: "in_warehouse_china" as ShipmentStatus,
+    location: { city: "Guangzhou", country: "China", facility: "Collection Point" },
+    description: "Package collected and received at origin",
     timestamp: "2024-12-20T10:00:00Z",
     createdById: "user-2",
   },
   {
     id: "event-1-4",
     shipmentId: "shipment-1",
-    type: "status_change" as TrackingEventType,
+    type: "scan" as TrackingEventType,
     status: "in_warehouse_china" as ShipmentStatus,
     location: { city: "Guangzhou", country: "China", facility: "Main Warehouse" },
-    description: "Package received at China warehouse",
+    description: "Package processed and prepared for shipping",
     timestamp: "2024-12-21T14:00:00Z",
     createdById: "user-2",
   },
@@ -1043,7 +1043,6 @@ export const useMockDataStore = create<MockDataState>()(
           pending: shipments.filter((s) => s.status === "pending" || s.status === "confirmed").length,
           inTransit: shipments.filter(
             (s) =>
-              s.status === "picked_up" ||
               s.status === "in_warehouse_china" ||
               s.status === "in_transit" ||
               s.status === "customs_clearance" ||

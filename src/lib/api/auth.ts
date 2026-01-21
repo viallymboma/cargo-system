@@ -5,22 +5,35 @@ import type {
   RegisterData,
   User,
 } from "@/types/auth.types";
+import {
+  toFrontendUser,
+  toBackendRegisterDto,
+  toBackendUserUpdateDto,
+  type BackendAuthResponse,
+  type BackendUser,
+} from "./adapters";
 
 export const authApi = {
   /**
    * Login user with email and password
+   * Backend: POST /auth/login
    */
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
-      const response = await apiClient.post<AuthResponse>(
+      console.log("Logging in with credentials:", credentials);
+      const response = await apiClient.post<BackendAuthResponse>(
         "/auth/login",
         credentials
       );
+      console.log("Response data:", response.data);
 
-      const { accessToken, refreshToken, user } = response.data;
+      const { accessToken, refreshToken, user: backendUser } = response.data;
       tokenManager.setTokens(accessToken, refreshToken);
 
-      return response.data;
+      // Transform backend user to frontend format
+      const user = toFrontendUser(backendUser);
+
+      return { user, accessToken, refreshToken };
     } catch (error) {
       return handleApiError(error);
     }
@@ -28,18 +41,25 @@ export const authApi = {
 
   /**
    * Register new user
+   * Backend: POST /auth/register
    */
   register: async (data: RegisterData): Promise<AuthResponse> => {
     try {
-      const response = await apiClient.post<AuthResponse>(
+      // Transform frontend registration data to backend format
+      const backendData = toBackendRegisterDto(data);
+
+      const response = await apiClient.post<BackendAuthResponse>(
         "/auth/register",
-        data
+        backendData
       );
 
-      const { accessToken, refreshToken } = response.data;
+      const { accessToken, refreshToken, user: backendUser } = response.data;
       tokenManager.setTokens(accessToken, refreshToken);
 
-      return response.data;
+      // Transform backend user to frontend format
+      const user = toFrontendUser(backendUser);
+
+      return { user, accessToken, refreshToken };
     } catch (error) {
       return handleApiError(error);
     }
@@ -47,6 +67,7 @@ export const authApi = {
 
   /**
    * Logout user
+   * Backend: POST /auth/logout
    */
   logout: async (): Promise<void> => {
     try {
@@ -60,11 +81,12 @@ export const authApi = {
 
   /**
    * Get current user profile
+   * Backend: GET /auth/me
    */
   getCurrentUser: async (): Promise<User> => {
     try {
-      const response = await apiClient.get<User>("/auth/me");
-      return response.data;
+      const response = await apiClient.get<BackendUser>("/auth/me");
+      return toFrontendUser(response.data);
     } catch (error) {
       return handleApiError(error);
     }
@@ -72,13 +94,26 @@ export const authApi = {
 
   /**
    * Update current user profile
+   * Backend: PATCH /users/:id (need to get user ID first)
+   * Note: Backend doesn't have PATCH /auth/me, so we use the users endpoint
    */
   updateProfile: async (
     data: Partial<Pick<User, "firstName" | "lastName" | "phone">>
   ): Promise<User> => {
     try {
-      const response = await apiClient.patch<User>("/auth/me", data);
-      return response.data;
+      // First get current user to get the ID
+      const currentUser = await apiClient.get<BackendUser>("/auth/me");
+      const userId = currentUser.data.id;
+
+      // Transform to backend format
+      const backendData = toBackendUserUpdateDto(data);
+
+      // Update via users endpoint
+      const response = await apiClient.patch<BackendUser>(
+        `/users/${userId}`,
+        backendData
+      );
+      return toFrontendUser(response.data);
     } catch (error) {
       return handleApiError(error);
     }
@@ -86,6 +121,7 @@ export const authApi = {
 
   /**
    * Change password
+   * Backend: POST /auth/change-password
    */
   changePassword: async (
     currentPassword: string,
@@ -103,6 +139,7 @@ export const authApi = {
 
   /**
    * Request password reset
+   * Backend: POST /auth/forgot-password
    */
   requestPasswordReset: async (email: string): Promise<void> => {
     try {
@@ -114,6 +151,7 @@ export const authApi = {
 
   /**
    * Reset password with token
+   * Backend: POST /auth/reset-password
    */
   resetPassword: async (token: string, newPassword: string): Promise<void> => {
     try {
@@ -125,6 +163,7 @@ export const authApi = {
 
   /**
    * Verify email with token
+   * Backend: POST /auth/verify-email
    */
   verifyEmail: async (token: string): Promise<void> => {
     try {
@@ -136,6 +175,7 @@ export const authApi = {
 
   /**
    * Resend verification email
+   * Backend: POST /auth/resend-verification
    */
   resendVerificationEmail: async (): Promise<void> => {
     try {

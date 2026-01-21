@@ -1,8 +1,7 @@
-// Shipment status
+// Shipment status (aligned with backend)
 export type ShipmentStatus =
   | "pending"
   | "confirmed"
-  | "picked_up"
   | "in_warehouse_china"
   | "in_transit"
   | "customs_clearance"

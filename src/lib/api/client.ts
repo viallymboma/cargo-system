@@ -1,6 +1,8 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { config } from "@/lib/config";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Full API URL with prefix for backend
+const API_URL = `${config.API_URL}${config.API_PREFIX}`;
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = "accessToken";

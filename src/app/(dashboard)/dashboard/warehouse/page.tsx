@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMockDataStore } from "@/lib/stores/mock-data-store";
+import { useState, useEffect, useCallback } from "react";
+import { warehouseApi, trackingApi, shipmentsApi } from "@/lib/api";
+import type { WarehouseInventoryItem } from "@/lib/api/warehouse";
+import type { FrontendWarehouse } from "@/lib/api/adapters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,125 +29,97 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Warehouse,
   Package,
   QrCode,
   Search,
-  MapPin,
-  Box,
-  Truck,
   Plane,
-  Ship,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
   Loader2,
   ScanLine,
+  RefreshCw,
+  Plus,
+  Edit,
+  Power,
+  PowerOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Shipment, ShipmentStatus } from "@/types/shipment.types";
 
-interface WarehouseLocation {
-  id: string;
-  name: string;
-  code: string;
-  city: string;
-  country: string;
-  capacity: number;
-  currentStock: number;
-  status: "operational" | "maintenance" | "closed";
-}
-
-const warehouses: WarehouseLocation[] = [
-  {
-    id: "wh-china-gz",
-    name: "Guangzhou Main Warehouse",
-    code: "GZ-01",
-    city: "Guangzhou",
-    country: "China",
-    capacity: 5000,
-    currentStock: 0,
-    status: "operational",
-  },
-  {
-    id: "wh-china-sh",
-    name: "Shanghai Distribution Center",
-    code: "SH-01",
-    city: "Shanghai",
-    country: "China",
-    capacity: 3000,
-    currentStock: 0,
-    status: "operational",
-  },
-  {
-    id: "wh-dubai",
-    name: "Dubai Transit Hub",
-    code: "DXB-01",
-    city: "Dubai",
-    country: "UAE",
-    capacity: 2000,
-    currentStock: 0,
-    status: "operational",
-  },
-  {
-    id: "wh-cameroon-dla",
-    name: "Douala Main Warehouse",
-    code: "DLA-01",
-    city: "Douala",
-    country: "Cameroon",
-    capacity: 3000,
-    currentStock: 0,
-    status: "operational",
-  },
-  {
-    id: "wh-cameroon-yde",
-    name: "Yaounde Distribution Center",
-    code: "YDE-01",
-    city: "Yaounde",
-    country: "Cameroon",
-    capacity: 1500,
-    currentStock: 0,
-    status: "operational",
-  },
-];
-
 export default function WarehousePage() {
+  const [warehouses, setWarehouses] = useState<FrontendWarehouse[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
-  const [warehouseInventory, setWarehouseInventory] = useState<Record<string, Shipment[]>>({});
+  const [inventory, setInventory] = useState<WarehouseInventoryItem[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedWarehouseForEdit, setSelectedWarehouseForEdit] = useState<FrontendWarehouse | null>(null);
 
-  const shipments = useMockDataStore((state) => state.shipments);
+  // Fetch warehouses
+  const fetchWarehouses = useCallback(async () => {
+    try {
+      const data = await warehouseApi.getWarehouses();
+      setWarehouses(data);
+    } catch (error) {
+      console.error("Failed to fetch warehouses:", error);
+      toast.error("Erreur lors du chargement des entrepôts");
+    }
+  }, []);
 
-  useEffect(() => {
-    // Group shipments by warehouse status
-    const inventory: Record<string, Shipment[]> = {
-      "wh-china-gz": [],
-      "wh-china-sh": [],
-      "wh-dubai": [],
-      "wh-cameroon-dla": [],
-      "wh-cameroon-yde": [],
-    };
-
-    shipments.forEach((shipment) => {
-      if (shipment.status === "in_warehouse_china") {
-        inventory["wh-china-gz"].push(shipment);
-      } else if (shipment.status === "in_warehouse_cameroon") {
-        inventory["wh-cameroon-dla"].push(shipment);
-      } else if (shipment.status === "customs_clearance") {
-        inventory["wh-cameroon-dla"].push(shipment);
+  // Fetch inventory
+  const fetchInventory = useCallback(async () => {
+    try {
+      const filters: { warehouseId?: string; isInWarehouse?: boolean } = { isInWarehouse: true };
+      if (selectedWarehouse !== "all") {
+        filters.warehouseId = selectedWarehouse;
       }
-    });
+      const data = await warehouseApi.getInventory(filters);
+      setInventory(data);
+    } catch (error) {
+      console.error("Failed to fetch inventory:", error);
+      toast.error("Erreur lors du chargement de l'inventaire");
+    }
+  }, [selectedWarehouse]);
 
-    setWarehouseInventory(inventory);
-  }, [shipments]);
+  // Fetch shipments for warehouse statuses
+  const fetchShipments = useCallback(async () => {
+    try {
+      const result = await shipmentsApi.getShipments({});
+      setShipments(result.data);
+    } catch (error) {
+      console.error("Failed to fetch shipments:", error);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchWarehouses(), fetchShipments()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [fetchWarehouses, fetchShipments]);
+
+  // Reload inventory when warehouse changes
+  useEffect(() => {
+    fetchInventory();
+  }, [fetchInventory]);
+
+  const refreshData = async () => {
+    setLoading(true);
+    await Promise.all([fetchWarehouses(), fetchInventory(), fetchShipments()]);
+    setLoading(false);
+    toast.success("Données actualisées");
+  };
 
   const getWarehouseStock = (warehouseId: string) => {
-    return warehouseInventory[warehouseId]?.length || 0;
+    return inventory.filter((item) => item.warehouseId === warehouseId && item.isInWarehouse).length;
   };
 
   const getFilteredShipments = () => {
@@ -154,17 +128,17 @@ export default function WarehousePage() {
         s.status === "in_warehouse_china" ||
         s.status === "in_warehouse_cameroon" ||
         s.status === "customs_clearance" ||
-        s.status === "picked_up"
+        s.status === "confirmed"
     );
 
     if (selectedWarehouse !== "all") {
       const warehouse = warehouses.find((w) => w.id === selectedWarehouse);
       if (warehouse) {
-        if (warehouse.country === "China") {
+        if (warehouse.country === "China" || warehouse.country === "Chine") {
           filtered = filtered.filter(
-            (s) => s.status === "in_warehouse_china" || s.status === "picked_up"
+            (s) => s.status === "in_warehouse_china" || s.status === "confirmed"
           );
-        } else if (warehouse.country === "Cameroon") {
+        } else if (warehouse.country === "Cameroon" || warehouse.country === "Cameroun") {
           filtered = filtered.filter(
             (s) => s.status === "in_warehouse_cameroon" || s.status === "customs_clearance"
           );
@@ -189,99 +163,166 @@ export default function WarehousePage() {
 
     setScanning(true);
     try {
-      // Simulate scanning delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // First try to find by QR code or barcode
+      let inventoryItem = await warehouseApi.scanQrCode(scanInput.trim());
+      if (!inventoryItem) {
+        inventoryItem = await warehouseApi.scanBarcode(scanInput.trim());
+      }
 
-      const shipment = useMockDataStore.getState().getShipmentByTrackingNumber(scanInput.trim());
+      // If not found in inventory, search in shipments by tracking number
+      const shipment = shipments.find(
+        (s) => s.trackingNumber.toLowerCase() === scanInput.trim().toLowerCase()
+      );
 
-      if (!shipment) {
-        toast.error("Shipment not found");
+      if (!shipment && !inventoryItem) {
+        toast.error("Colis non trouvé");
+        return;
+      }
+
+      const targetShipment = shipment || (inventoryItem ? shipments.find(s => s.id === inventoryItem!.shipmentId) : null);
+
+      if (!targetShipment) {
+        toast.error("Expédition non trouvée");
         return;
       }
 
       // Determine next status based on current status
       let nextStatus: ShipmentStatus | null = null;
       let description = "";
+      let location = { city: "Douala", country: "Cameroon" };
 
-      switch (shipment.status) {
-        case "picked_up":
+      if (selectedWarehouse !== "all") {
+        const warehouse = warehouses.find((w) => w.id === selectedWarehouse);
+        if (warehouse) {
+          location = { city: warehouse.city, country: warehouse.country };
+        }
+      }
+
+      switch (targetShipment.status) {
+        case "confirmed":
           nextStatus = "in_warehouse_china";
-          description = "Package scanned and received at China warehouse";
+          description = "Colis scanné et reçu à l'entrepôt d'origine";
           break;
         case "in_warehouse_china":
           nextStatus = "in_transit";
-          description = "Package scanned and dispatched for transit";
+          description = "Colis scanné et expédié pour transit";
           break;
         case "in_transit":
           nextStatus = "customs_clearance";
-          description = "Package arrived and scanned at customs";
+          description = "Colis arrivé et scanné aux douanes";
           break;
         case "customs_clearance":
           nextStatus = "in_warehouse_cameroon";
-          description = "Package cleared customs, received at Cameroon warehouse";
+          description = "Colis dédouané, reçu à l'entrepôt de destination";
           break;
         case "in_warehouse_cameroon":
           nextStatus = "out_for_delivery";
-          description = "Package scanned and dispatched for delivery";
+          description = "Colis scanné et envoyé pour livraison";
           break;
         default:
-          toast.info(`Package is currently: ${shipment.status}`);
+          toast.info(`Le colis est actuellement: ${targetShipment.status.replace(/_/g, " ")}`);
           return;
       }
 
       if (nextStatus) {
-        useMockDataStore.getState().addTrackingEvent({
-          shipmentId: shipment.id,
-          type: "scan",
-          status: nextStatus,
-          location: {
-            city: selectedWarehouse !== "all"
-              ? warehouses.find(w => w.id === selectedWarehouse)?.city || "Unknown"
-              : "Douala",
-            country: selectedWarehouse !== "all"
-              ? warehouses.find(w => w.id === selectedWarehouse)?.country || "Cameroon"
-              : "Cameroon",
-          },
-          description,
-        });
+        await trackingApi.updateShipmentStatus(
+          targetShipment.id,
+          nextStatus,
+          location,
+          description
+        );
 
-        toast.success(`Package scanned! Status: ${nextStatus.replace(/_/g, " ")}`);
+        toast.success(`Colis scanné! Statut: ${nextStatus.replace(/_/g, " ")}`);
         setScanInput("");
+        await refreshData();
       }
+    } catch (error) {
+      console.error("Scan error:", error);
+      toast.error("Erreur lors du scan");
     } finally {
       setScanning(false);
     }
   };
 
+  const handleActivateWarehouse = async (id: string) => {
+    try {
+      await warehouseApi.activateWarehouse(id);
+      toast.success("Entrepôt activé");
+      await fetchWarehouses();
+    } catch (error) {
+      console.error("Failed to activate warehouse:", error);
+      toast.error("Erreur lors de l'activation");
+    }
+  };
+
+  const handleDeactivateWarehouse = async (id: string) => {
+    try {
+      await warehouseApi.deactivateWarehouse(id);
+      toast.success("Entrepôt désactivé");
+      await fetchWarehouses();
+    } catch (error) {
+      console.error("Failed to deactivate warehouse:", error);
+      toast.error("Erreur lors de la désactivation");
+    }
+  };
+
   const statusColors: Record<string, string> = {
-    picked_up: "bg-indigo-100 text-indigo-800",
+    confirmed: "bg-blue-100 text-blue-800",
     in_warehouse_china: "bg-purple-100 text-purple-800",
     in_transit: "bg-cyan-100 text-cyan-800",
     customs_clearance: "bg-orange-100 text-orange-800",
     in_warehouse_cameroon: "bg-teal-100 text-teal-800",
   };
 
+  const statusLabels: Record<string, string> = {
+    confirmed: "Confirmé",
+    in_warehouse_china: "Entrepôt Chine",
+    in_transit: "En transit",
+    customs_clearance: "Dédouanement",
+    in_warehouse_cameroon: "Entrepôt Cameroun",
+    out_for_delivery: "En livraison",
+    delivered: "Livré",
+  };
+
+  if (loading && warehouses.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Warehouse Management</h1>
-          <p className="text-gray-500">Manage inventory across all warehouses</p>
+          <h1 className="text-3xl font-bold">Gestion des Entrepôts</h1>
+          <p className="text-gray-500">Gérer l'inventaire de tous les entrepôts</p>
         </div>
-        <Button onClick={() => setScanDialogOpen(true)}>
-          <ScanLine className="mr-2 h-4 w-4" />
-          Scan Package
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={refreshData} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+          <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvel Entrepôt
+          </Button>
+          <Button onClick={() => setScanDialogOpen(true)}>
+            <ScanLine className="mr-2 h-4 w-4" />
+            Scanner un Colis
+          </Button>
+        </div>
       </div>
 
       {/* Warehouse Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {warehouses.map((warehouse) => (
           <Card
             key={warehouse.id}
             className={`cursor-pointer transition-all ${
               selectedWarehouse === warehouse.id ? "ring-2 ring-blue-500" : ""
-            }`}
+            } ${!warehouse.isActive ? "opacity-60" : ""}`}
             onClick={() =>
               setSelectedWarehouse(selectedWarehouse === warehouse.id ? "all" : warehouse.id)
             }
@@ -289,26 +330,59 @@ export default function WarehousePage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
                 <Warehouse className="h-8 w-8 text-gray-400" />
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    warehouse.status === "operational"
-                      ? "bg-green-100 text-green-800"
-                      : warehouse.status === "maintenance"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {warehouse.status}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      warehouse.isActive
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {warehouse.isActive ? "Actif" : "Inactif"}
+                  </span>
+                  <div className="flex gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        setSelectedWarehouseForEdit(warehouse);
+                        setEditDialogOpen(true);
+                      }}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    {warehouse.isActive ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleDeactivateWarehouse(warehouse.id)}
+                      >
+                        <PowerOff className="h-3 w-3 text-orange-500" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleActivateWarehouse(warehouse.id)}
+                      >
+                        <Power className="h-3 w-3 text-green-500" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
               <h3 className="font-semibold">{warehouse.name}</h3>
               <p className="text-sm text-gray-500">
                 {warehouse.city}, {warehouse.country}
               </p>
+              <p className="text-xs text-gray-400 font-mono">{warehouse.code}</p>
               <div className="mt-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Inventory</span>
-                  <span className="font-medium">{getWarehouseStock(warehouse.id)} packages</span>
+                  <span className="text-gray-500">Inventaire</span>
+                  <span className="font-medium">{getWarehouseStock(warehouse.id)} colis</span>
                 </div>
                 <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
                   <div
@@ -321,6 +395,9 @@ export default function WarehousePage() {
                     }}
                   />
                 </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Capacité: {warehouse.capacity}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -333,12 +410,12 @@ export default function WarehousePage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Awaiting Pickup</p>
+                <p className="text-sm text-gray-500">Reçus à l'origine</p>
                 <p className="text-2xl font-bold">
-                  {shipments.filter((s) => s.status === "picked_up").length}
+                  {shipments.filter((s) => s.status === "confirmed").length}
                 </p>
               </div>
-              <Package className="h-8 w-8 text-indigo-500" />
+              <Package className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
@@ -346,7 +423,7 @@ export default function WarehousePage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">In China Warehouses</p>
+                <p className="text-sm text-gray-500">Entrepôts Chine</p>
                 <p className="text-2xl font-bold">
                   {shipments.filter((s) => s.status === "in_warehouse_china").length}
                 </p>
@@ -359,7 +436,7 @@ export default function WarehousePage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">In Transit</p>
+                <p className="text-sm text-gray-500">En Transit</p>
                 <p className="text-2xl font-bold">
                   {shipments.filter((s) => s.status === "in_transit").length}
                 </p>
@@ -372,7 +449,7 @@ export default function WarehousePage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">In Cameroon Warehouses</p>
+                <p className="text-sm text-gray-500">Entrepôts Cameroun</p>
                 <p className="text-2xl font-bold">
                   {shipments.filter((s) => s.status === "in_warehouse_cameroon").length}
                 </p>
@@ -387,11 +464,11 @@ export default function WarehousePage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Warehouse Inventory</CardTitle>
+            <CardTitle>Inventaire des Entrepôts</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search packages..."
+                placeholder="Rechercher des colis..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -403,12 +480,12 @@ export default function WarehousePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tracking #</TableHead>
-                <TableHead>Receiver</TableHead>
+                <TableHead>N° Suivi</TableHead>
+                <TableHead>Destinataire</TableHead>
                 <TableHead>Destination</TableHead>
-                <TableHead>Weight</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Received</TableHead>
+                <TableHead>Poids</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Reçu le</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -429,11 +506,11 @@ export default function WarehousePage() {
                         statusColors[shipment.status] || "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {shipment.status.replace(/_/g, " ")}
+                      {statusLabels[shipment.status] || shipment.status.replace(/_/g, " ")}
                     </span>
                   </TableCell>
                   <TableCell>
-                    {new Date(shipment.updatedAt).toLocaleDateString()}
+                    {new Date(shipment.updatedAt).toLocaleDateString("fr-FR")}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -445,7 +522,7 @@ export default function WarehousePage() {
                       }}
                     >
                       <QrCode className="h-4 w-4 mr-1" />
-                      Scan
+                      Scanner
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -453,7 +530,7 @@ export default function WarehousePage() {
               {getFilteredShipments().length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No packages in warehouse
+                    Aucun colis dans l'entrepôt
                   </TableCell>
                 </TableRow>
               )}
@@ -466,17 +543,17 @@ export default function WarehousePage() {
       <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Scan Package</DialogTitle>
+            <DialogTitle>Scanner un Colis</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-center p-8 border-2 border-dashed rounded-lg">
               <QrCode className="h-16 w-16 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-500">
-                Scan barcode or enter tracking number manually
+                Scannez le code-barres ou entrez le numéro de suivi manuellement
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Tracking Number</Label>
+              <Label>Numéro de Suivi</Label>
               <Input
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
@@ -485,12 +562,13 @@ export default function WarehousePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Warehouse Location</Label>
+              <Label>Emplacement de l'Entrepôt</Label>
               <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select warehouse" />
+                  <SelectValue placeholder="Sélectionner un entrepôt" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Tous les entrepôts</SelectItem>
                   {warehouses.map((wh) => (
                     <SelectItem key={wh.id} value={wh.id}>
                       {wh.name} ({wh.code})
@@ -503,18 +581,351 @@ export default function WarehousePage() {
               {scanning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  Traitement...
                 </>
               ) : (
                 <>
                   <ScanLine className="mr-2 h-4 w-4" />
-                  Confirm Scan
+                  Confirmer le Scan
                 </>
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Create Warehouse Dialog */}
+      <CreateWarehouseDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={() => {
+          fetchWarehouses();
+          setCreateDialogOpen(false);
+        }}
+      />
+
+      {/* Edit Warehouse Dialog */}
+      {selectedWarehouseForEdit && (
+        <EditWarehouseDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          warehouse={selectedWarehouseForEdit}
+          onSuccess={() => {
+            fetchWarehouses();
+            setEditDialogOpen(false);
+            setSelectedWarehouseForEdit(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Create Warehouse Dialog Component
+function CreateWarehouseDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    code: "",
+    city: "",
+    country: "",
+    address: "",
+    phone: "",
+    email: "",
+    capacity: 1000,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await warehouseApi.createWarehouse(formData);
+      toast.success("Entrepôt créé avec succès");
+      onSuccess();
+      setFormData({
+        name: "",
+        code: "",
+        city: "",
+        country: "",
+        address: "",
+        phone: "",
+        email: "",
+        capacity: 1000,
+      });
+    } catch (error) {
+      console.error("Failed to create warehouse:", error);
+      toast.error("Erreur lors de la création de l'entrepôt");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Créer un Nouvel Entrepôt</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nom</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Entrepôt Principal"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Code</Label>
+              <Input
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="WH-001"
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Ville</Label>
+              <Input
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="Douala"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Pays</Label>
+              <Input
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                placeholder="Cameroun"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Adresse</Label>
+            <Input
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="123 Rue Principale"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Téléphone</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+237 6XX XXX XXX"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="entrepot@dhl.com"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Capacité</Label>
+            <Input
+              type="number"
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+              placeholder="1000"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                "Créer"
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Warehouse Dialog Component
+function EditWarehouseDialog({
+  open,
+  onOpenChange,
+  warehouse,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  warehouse: FrontendWarehouse;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: warehouse.name,
+    code: warehouse.code,
+    city: warehouse.city,
+    country: warehouse.country,
+    address: warehouse.address,
+    phone: warehouse.phone,
+    email: warehouse.email,
+    capacity: warehouse.capacity,
+  });
+
+  useEffect(() => {
+    setFormData({
+      name: warehouse.name,
+      code: warehouse.code,
+      city: warehouse.city,
+      country: warehouse.country,
+      address: warehouse.address,
+      phone: warehouse.phone,
+      email: warehouse.email,
+      capacity: warehouse.capacity,
+    });
+  }, [warehouse]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await warehouseApi.updateWarehouse(warehouse.id, formData);
+      toast.success("Entrepôt mis à jour avec succès");
+      onSuccess();
+    } catch (error) {
+      console.error("Failed to update warehouse:", error);
+      toast.error("Erreur lors de la mise à jour de l'entrepôt");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Modifier l'Entrepôt</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nom</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Code</Label>
+              <Input
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Ville</Label>
+              <Input
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Pays</Label>
+              <Input
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Adresse</Label>
+            <Input
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Téléphone</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Capacité</Label>
+            <Input
+              type="number"
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mise à jour...
+                </>
+              ) : (
+                "Enregistrer"
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { shipmentsApi } from "@/lib/api";
-import { useMockDataStore } from "@/lib/stores/mock-data-store";
+import { useState, useEffect, useCallback } from "react";
+import { shipmentsApi, trackingApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,38 +20,37 @@ import {
   CheckCircle,
   Truck,
   Plane,
-  Ship,
   Warehouse,
   FileCheck,
   Loader2,
   ArrowRight,
   ArrowLeft,
+  RefreshCw,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { TrackingSummary, TrackingEvent } from "@/types/tracking.types";
-import type { ShipmentStatus } from "@/types/shipment.types";
+import type { TrackingSummary } from "@/types/tracking.types";
+import type { Shipment, ShipmentStatus } from "@/types/shipment.types";
 
 const statusConfig: Record<
   ShipmentStatus,
   { icon: React.ReactNode; color: string; label: string }
 > = {
-  pending: { icon: <Clock className="h-5 w-5" />, color: "text-yellow-500", label: "Pending" },
-  confirmed: { icon: <CheckCircle className="h-5 w-5" />, color: "text-blue-500", label: "Confirmed" },
-  picked_up: { icon: <Package className="h-5 w-5" />, color: "text-indigo-500", label: "Picked Up" },
-  in_warehouse_china: { icon: <Warehouse className="h-5 w-5" />, color: "text-purple-500", label: "In Warehouse (China)" },
-  in_transit: { icon: <Plane className="h-5 w-5" />, color: "text-cyan-500", label: "In Transit" },
-  customs_clearance: { icon: <FileCheck className="h-5 w-5" />, color: "text-orange-500", label: "Customs Clearance" },
-  in_warehouse_cameroon: { icon: <Warehouse className="h-5 w-5" />, color: "text-teal-500", label: "In Warehouse (Cameroon)" },
-  out_for_delivery: { icon: <Truck className="h-5 w-5" />, color: "text-lime-500", label: "Out for Delivery" },
-  delivered: { icon: <CheckCircle className="h-5 w-5" />, color: "text-green-500", label: "Delivered" },
-  cancelled: { icon: <Clock className="h-5 w-5" />, color: "text-red-500", label: "Cancelled" },
-  returned: { icon: <Package className="h-5 w-5" />, color: "text-gray-500", label: "Returned" },
+  pending: { icon: <Clock className="h-5 w-5" />, color: "text-yellow-500", label: "En attente" },
+  confirmed: { icon: <CheckCircle className="h-5 w-5" />, color: "text-blue-500", label: "Reçu à l'origine" },
+  in_warehouse_china: { icon: <Warehouse className="h-5 w-5" />, color: "text-purple-500", label: "Entrepôt d'origine" },
+  in_transit: { icon: <Plane className="h-5 w-5" />, color: "text-cyan-500", label: "En transit" },
+  customs_clearance: { icon: <FileCheck className="h-5 w-5" />, color: "text-orange-500", label: "Dédouanement" },
+  in_warehouse_cameroon: { icon: <Warehouse className="h-5 w-5" />, color: "text-teal-500", label: "Entrepôt destination" },
+  out_for_delivery: { icon: <Truck className="h-5 w-5" />, color: "text-lime-500", label: "En livraison" },
+  delivered: { icon: <CheckCircle className="h-5 w-5" />, color: "text-green-500", label: "Livré" },
+  cancelled: { icon: <XCircle className="h-5 w-5" />, color: "text-red-500", label: "Annulé" },
+  returned: { icon: <Package className="h-5 w-5" />, color: "text-gray-500", label: "Retourné" },
 };
 
 const statusOrder: ShipmentStatus[] = [
   "pending",
   "confirmed",
-  "picked_up",
   "in_warehouse_china",
   "in_transit",
   "customs_clearance",
@@ -67,9 +65,27 @@ export default function TrackingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Fetch recent shipments
+  const fetchRecentShipments = useCallback(async () => {
+    try {
+      const result = await shipmentsApi.getShipments({ pageSize: 4 });
+      setRecentShipments(result.data.slice(0, 4));
+    } catch (err) {
+      console.error("Failed to fetch recent shipments:", err);
+    } finally {
+      setLoadingRecent(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRecentShipments();
+  }, [fetchRecentShipments]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!trackingNumber.trim()) return;
 
     setLoading(true);
@@ -77,14 +93,15 @@ export default function TrackingPage() {
     setTracking(null);
 
     try {
-      const result = await shipmentsApi.getTracking(trackingNumber.trim());
+      const result = await trackingApi.getTrackingByNumber(trackingNumber.trim());
       if (result) {
         setTracking(result);
       } else {
-        setError("Shipment not found");
+        setError("Expédition non trouvée");
       }
     } catch (err) {
-      setError("Failed to fetch tracking information");
+      console.error("Failed to fetch tracking:", err);
+      setError("Impossible de récupérer les informations de suivi");
     } finally {
       setLoading(false);
     }
@@ -95,28 +112,33 @@ export default function TrackingPage() {
 
     setUpdateLoading(true);
     try {
-      const shipment = useMockDataStore.getState().getShipmentByTrackingNumber(tracking.trackingNumber);
+      // Get shipment ID from tracking
+      const shipmentsResult = await shipmentsApi.getShipments({});
+      const shipment = shipmentsResult.data.find(
+        (s: Shipment) => s.trackingNumber === tracking.trackingNumber
+      );
+
       if (shipment) {
-        await shipmentsApi.addTrackingEvent({
-          shipmentId: shipment.id,
-          type: "status_change",
-          status: newStatus,
-          location: {
+        await trackingApi.updateShipmentStatus(
+          shipment.id,
+          newStatus,
+          {
             city: getLocationForStatus(newStatus),
             country: getCountryForStatus(newStatus),
           },
-          description: `Status updated to ${statusConfig[newStatus].label}`,
-        });
+          `Statut mis à jour: ${statusConfig[newStatus].label}`
+        );
 
         // Refresh tracking
-        const result = await shipmentsApi.getTracking(tracking.trackingNumber);
+        const result = await trackingApi.getTrackingByNumber(tracking.trackingNumber);
         if (result) {
           setTracking(result);
-          toast.success(`Status updated to ${statusConfig[newStatus].label}`);
+          toast.success(`Statut mis à jour: ${statusConfig[newStatus].label}`);
         }
       }
     } catch (err) {
-      toast.error("Failed to update status");
+      console.error("Failed to update status:", err);
+      toast.error("Erreur lors de la mise à jour du statut");
     } finally {
       setUpdateLoading(false);
     }
@@ -124,35 +146,35 @@ export default function TrackingPage() {
 
   const getLocationForStatus = (status: ShipmentStatus): string => {
     switch (status) {
-      case "picked_up":
+      case "confirmed":
       case "in_warehouse_china":
         return "Guangzhou";
       case "in_transit":
-        return "In Air";
+        return "En Vol";
       case "customs_clearance":
       case "in_warehouse_cameroon":
       case "out_for_delivery":
       case "delivered":
         return "Douala";
       default:
-        return "Unknown";
+        return "Inconnu";
     }
   };
 
   const getCountryForStatus = (status: ShipmentStatus): string => {
     switch (status) {
-      case "picked_up":
+      case "confirmed":
       case "in_warehouse_china":
-        return "China";
+        return "Chine";
       case "in_transit":
         return "International";
       default:
-        return "Cameroon";
+        return "Cameroun";
     }
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleString("en-US", {
+    return new Date(date).toLocaleString("fr-FR", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -166,11 +188,25 @@ export default function TrackingPage() {
     return statusOrder.indexOf(tracking.currentStatus);
   };
 
+  const handleQuickSearch = (shipmentTrackingNumber: string) => {
+    setTrackingNumber(shipmentTrackingNumber);
+    // Trigger search after state update
+    setTimeout(() => {
+      handleSearch();
+    }, 0);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Track Shipment</h1>
-        <p className="text-gray-500">Enter a tracking number to view shipment status</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Suivi des Expéditions</h1>
+          <p className="text-gray-500">Entrez un numéro de suivi pour voir le statut de l'expédition</p>
+        </div>
+        <Button variant="outline" onClick={fetchRecentShipments} disabled={loadingRecent}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${loadingRecent ? "animate-spin" : ""}`} />
+          Actualiser
+        </Button>
       </div>
 
       {/* Search */}
@@ -180,7 +216,7 @@ export default function TrackingPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
-                placeholder="Enter tracking number (e.g., ST-2401ABC123)"
+                placeholder="Entrez le numéro de suivi (ex: ST-2401ABC123)"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
                 className="pl-12 h-12 text-lg"
@@ -190,7 +226,7 @@ export default function TrackingPage() {
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                "Track"
+                "Rechercher"
               )}
             </Button>
           </form>
@@ -201,33 +237,40 @@ export default function TrackingPage() {
       {!tracking && !error && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Shipments</CardTitle>
+            <CardTitle>Expéditions Récentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {useMockDataStore.getState().shipments.slice(0, 4).map((shipment) => (
-                <button
-                  key={shipment.id}
-                  onClick={() => {
-                    setTrackingNumber(shipment.trackingNumber);
-                    handleSearch({ preventDefault: () => {} } as React.FormEvent);
-                  }}
-                  className="text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <p className="font-mono font-medium text-sm">{shipment.trackingNumber}</p>
-                  <p className="text-sm text-gray-500 mt-1">{shipment.receiver.name}</p>
-                  <div className="mt-2">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        statusConfig[shipment.status].color
-                      } bg-opacity-10`}
-                    >
-                      {statusConfig[shipment.status].label}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {loadingRecent ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              </div>
+            ) : recentShipments.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Aucune expédition récente
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {recentShipments.map((shipment) => (
+                  <button
+                    key={shipment.id}
+                    onClick={() => handleQuickSearch(shipment.trackingNumber)}
+                    className="text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <p className="font-mono font-medium text-sm">{shipment.trackingNumber}</p>
+                    <p className="text-sm text-gray-500 mt-1">{shipment.receiver.name}</p>
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          statusConfig[shipment.status].color
+                        } bg-opacity-10`}
+                      >
+                        {statusConfig[shipment.status].label}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -255,7 +298,7 @@ export default function TrackingPage() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to list
+            Retour à la liste
           </Button>
 
           {/* Summary Card */}
@@ -265,7 +308,7 @@ export default function TrackingPage() {
                 <div>
                   <CardTitle className="text-2xl font-mono">{tracking.trackingNumber}</CardTitle>
                   <p className="text-gray-500 mt-1">
-                    Last updated: {formatDate(tracking.lastUpdate)}
+                    Dernière mise à jour: {formatDate(tracking.lastUpdate)}
                   </p>
                 </div>
                 <div className={`flex items-center gap-2 ${statusConfig[tracking.currentStatus].color}`}>
@@ -297,7 +340,7 @@ export default function TrackingPage() {
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
                     <Clock className="inline h-4 w-4 mr-1" />
-                    Estimated Delivery: {formatDate(tracking.estimatedDelivery)}
+                    Livraison estimée: {formatDate(tracking.estimatedDelivery)}
                   </p>
                 </div>
               )}
@@ -307,7 +350,7 @@ export default function TrackingPage() {
           {/* Progress Bar */}
           <Card>
             <CardHeader>
-              <CardTitle>Shipment Progress</CardTitle>
+              <CardTitle>Progression de l'Expédition</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="relative">
@@ -358,7 +401,7 @@ export default function TrackingPage() {
           {/* Update Status (Admin) */}
           <Card>
             <CardHeader>
-              <CardTitle>Update Status</CardTitle>
+              <CardTitle>Mettre à jour le Statut</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-4">
@@ -367,7 +410,7 @@ export default function TrackingPage() {
                   disabled={updateLoading}
                 >
                   <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="Select new status" />
+                    <SelectValue placeholder="Sélectionner un nouveau statut" />
                   </SelectTrigger>
                   <SelectContent>
                     {statusOrder.map((status) => (
@@ -390,40 +433,46 @@ export default function TrackingPage() {
           {/* Timeline */}
           <Card>
             <CardHeader>
-              <CardTitle>Tracking History</CardTitle>
+              <CardTitle>Historique de Suivi</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {tracking.events.map((event, index) => (
-                  <div key={event.id} className="flex gap-4">
-                    <div className="relative">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          index === 0
-                            ? "bg-green-500 text-white"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {statusConfig[event.status].icon}
+              {tracking.events.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Aucun événement de suivi
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {tracking.events.map((event, index) => (
+                    <div key={event.id} className="flex gap-4">
+                      <div className="relative">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            index === 0
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {statusConfig[event.status]?.icon || <Clock className="h-5 w-5" />}
+                        </div>
+                        {index < tracking.events.length - 1 && (
+                          <div className="absolute top-10 left-1/2 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
+                        )}
                       </div>
-                      {index < tracking.events.length - 1 && (
-                        <div className="absolute top-10 left-1/2 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-6">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{event.description}</p>
-                        <p className="text-sm text-gray-500">{formatDate(event.timestamp)}</p>
+                      <div className="flex-1 pb-6">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{event.description}</p>
+                          <p className="text-sm text-gray-500">{formatDate(event.timestamp)}</p>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">
+                          <MapPin className="inline h-3 w-3 mr-1" />
+                          {event.location.city}, {event.location.country}
+                          {event.location.facility && ` - ${event.location.facility}`}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        <MapPin className="inline h-3 w-3 mr-1" />
-                        {event.location.city}, {event.location.country}
-                        {event.location.facility && ` - ${event.location.facility}`}
-                      </p>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -76,15 +76,14 @@ export interface WarehouseScanData {
   notes?: string;
 }
 
-// Status mapping for display
+// Status mapping for display (aligned with backend)
 export const StatusLabels: Record<ShipmentStatus, string> = {
   pending: "Pending",
-  confirmed: "Confirmed",
-  picked_up: "Picked Up",
-  in_warehouse_china: "At China Warehouse",
+  confirmed: "Received at Origin",
+  in_warehouse_china: "At Origin Warehouse",
   in_transit: "In Transit",
   customs_clearance: "Customs Clearance",
-  in_warehouse_cameroon: "At Cameroon Warehouse",
+  in_warehouse_cameroon: "At Destination Warehouse",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
   returned: "Returned",
@@ -95,7 +94,6 @@ export const StatusLabels: Record<ShipmentStatus, string> = {
 export const StatusColors: Record<ShipmentStatus, string> = {
   pending: "gray",
   confirmed: "blue",
-  picked_up: "blue",
   in_warehouse_china: "indigo",
   in_transit: "purple",
   customs_clearance: "yellow",

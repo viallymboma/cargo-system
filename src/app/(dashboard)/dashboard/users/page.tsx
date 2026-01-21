@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useMockDataStore } from "@/lib/stores/mock-data-store";
+import { usersApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -41,20 +41,19 @@ import {
   Trash2,
   Loader2,
   CheckCircle,
-  XCircle,
-  MoreHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { User, Role, Agency } from "@/types/auth.types";
-import { RolePermissions } from "@/types/auth.types";
+import { type User, type Role, type Agency } from "@/types/auth.types";
+import { Switch } from "@/components/ui/switch";
 
 const roleLabels: Record<Role, string> = {
   super_admin: "Super Admin",
-  admin: "Admin",
+  admin: "Administrateur",
   manager: "Manager",
   agent: "Agent",
-  warehouse_staff: "Warehouse Staff",
-  customer: "Customer",
+  warehouse_staff: "Personnel Entrepôt",
+  customer: "Client",
 };
 
 const roleColors: Record<Role, string> = {
@@ -67,7 +66,7 @@ const roleColors: Record<Role, string> = {
 };
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<(User & { password?: string })[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,17 +74,27 @@ export default function UsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isToggleConfirmOpen, setIsToggleConfirmOpen] = useState(false);
+  const [userToToggle, setUserToToggle] = useState<User | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const store = useMockDataStore.getState();
-      setUsers(store.users);
-      setAgencies(store.agencies);
+      const [usersData, agenciesData] = await Promise.all([
+        usersApi.getUsers(),
+        usersApi.getAgencies(),
+      ]);
+      setUsers(usersData);
+      setAgencies(agenciesData);
+    } catch (error) {
+      toast.error("Échec du chargement des données");
+      console.error("Failed to load data:", error);
     } finally {
       setLoading(false);
     }
@@ -111,26 +120,45 @@ export default function UsersPage() {
     return filtered;
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
-
-    useMockDataStore.setState((state) => ({
-      users: state.users.filter((u) => u.id !== userId),
-    }));
-
-    toast.success("User deleted successfully");
-    loadData();
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteConfirmOpen(true);
   };
 
-  const handleToggleActive = (userId: string, isActive: boolean) => {
-    useMockDataStore.setState((state) => ({
-      users: state.users.map((u) =>
-        u.id === userId ? { ...u, isActive: !isActive } : u
-      ),
-    }));
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      await usersApi.deleteUser(userToDelete.id);
+      toast.success("Utilisateur supprimé avec succès");
+      setIsDeleteConfirmOpen(false);
+      setUserToDelete(null);
+      loadData();
+    } catch {
+      toast.error("Échec de la suppression de l'utilisateur");
+    }
+  };
 
-    toast.success(isActive ? "User deactivated" : "User activated");
-    loadData();
+  const handleToggleClick = (user: User) => {
+    setUserToToggle(user);
+    setIsToggleConfirmOpen(true);
+  };
+
+  const confirmToggleActive = async () => {
+    if (!userToToggle) return;
+    try {
+      if (userToToggle.isActive) {
+        await usersApi.deactivateUser(userToToggle.id);
+        toast.success("Utilisateur désactivé");
+      } else {
+        await usersApi.activateUser(userToToggle.id);
+        toast.success("Utilisateur activé");
+      }
+      setIsToggleConfirmOpen(false);
+      setUserToToggle(null);
+      loadData();
+    } catch {
+      toast.error("Échec de la mise à jour du statut");
+    }
   };
 
   const getUserStats = () => {
@@ -148,26 +176,26 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-gray-500">Manage users, roles, and permissions</p>
+          <h1 className="text-3xl font-bold">Gestion des Utilisateurs</h1>
+          <p className="text-gray-500">Gérer les utilisateurs, rôles et permissions</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
-              Add User
+              Ajouter un Utilisateur
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
+              <DialogTitle>Créer un Nouvel Utilisateur</DialogTitle>
             </DialogHeader>
             <CreateUserForm
               agencies={agencies}
               onSuccess={() => {
                 setIsCreateOpen(false);
                 loadData();
-                toast.success("User created successfully");
+                toast.success("Utilisateur créé avec succès");
               }}
             />
           </DialogContent>
@@ -180,7 +208,7 @@ export default function UsersPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Users</p>
+                <p className="text-sm text-gray-500">Total Utilisateurs</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-full">
@@ -193,7 +221,7 @@ export default function UsersPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Active Users</p>
+                <p className="text-sm text-gray-500">Utilisateurs Actifs</p>
                 <p className="text-2xl font-bold">{stats.active}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -206,7 +234,7 @@ export default function UsersPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Administrators</p>
+                <p className="text-sm text-gray-500">Administrateurs</p>
                 <p className="text-2xl font-bold">{stats.admins}</p>
               </div>
               <div className="p-3 bg-purple-100 rounded-full">
@@ -237,7 +265,7 @@ export default function UsersPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search users..."
+                placeholder="Rechercher des utilisateurs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -245,10 +273,10 @@ export default function UsersPage() {
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by role" />
+                <SelectValue placeholder="Filtrer par rôle" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="all">Tous les Rôles</SelectItem>
                 {Object.entries(roleLabels).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -271,11 +299,11 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Agency</TableHead>
+                  <TableHead>Utilisateur</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead>Agence</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -286,8 +314,8 @@ export default function UsersPage() {
                       <div className="flex items-center gap-3">
                         <Avatar>
                           <AvatarFallback>
-                            {user.firstName[0]}
-                            {user.lastName[0]}
+                            {user.firstName?.[0] || "U"}
+                            {user.lastName?.[0] || ""}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -330,26 +358,12 @@ export default function UsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => handleToggleActive(user.id, user.isActive)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {user.isActive ? (
-                          <>
-                            <CheckCircle className="h-3 w-3" />
-                            Active
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-3 w-3" />
-                            Inactive
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center">
+                        <Switch
+                          checked={user.isActive}
+                          onCheckedChange={() => handleToggleClick(user)}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -360,13 +374,15 @@ export default function UsersPage() {
                             setSelectedUser(user);
                             setIsEditOpen(true);
                           }}
+                          title="Modifier"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => handleDeleteClick(user)}
+                          title="Supprimer"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -377,7 +393,7 @@ export default function UsersPage() {
                 {getFilteredUsers().length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      No users found
+                      Aucun utilisateur trouvé
                     </TableCell>
                   </TableRow>
                 )}
@@ -387,11 +403,69 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
+      {/* Delete User Confirm Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">{"Confirmer la suppression"}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-red-50 text-red-800 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <p className="text-sm">
+                {`Êtes-vous sûr de vouloir supprimer l'utilisateur ${userToDelete?.firstName} ${userToDelete?.lastName} ? Cette action est irréversible.`}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+                {"Annuler"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteUser}
+              >
+                {"Supprimer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle Activation Confirm Dialog */}
+      <Dialog open={isToggleConfirmOpen} onOpenChange={setIsToggleConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{"Confirmer le changement de statut"}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 text-blue-800 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-blue-600" />
+              <p className="text-sm">
+                {userToToggle?.isActive
+                  ? `Voulez-vous vraiment désactiver l'utilisateur ${userToToggle?.firstName} ${userToToggle?.lastName} ?`
+                  : `Voulez-vous vraiment activer l'utilisateur ${userToToggle?.firstName} ${userToToggle?.lastName} ?`}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setIsToggleConfirmOpen(false)}>
+                {"Annuler"}
+              </Button>
+              <Button
+                variant={userToToggle?.isActive ? "destructive" : "default"}
+                onClick={confirmToggleActive}
+              >
+                {userToToggle?.isActive ? "Désactiver" : "Activer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit User Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>{"Modifier l'Utilisateur"}</DialogTitle>
           </DialogHeader>
           {selectedUser && (
             <EditUserForm
@@ -400,7 +474,7 @@ export default function UsersPage() {
               onSuccess={() => {
                 setIsEditOpen(false);
                 loadData();
-                toast.success("User updated successfully");
+                toast.success("Utilisateur mis à jour avec succès");
               }}
             />
           )}
@@ -433,29 +507,18 @@ function CreateUserForm({
     setLoading(true);
 
     try {
-      const agency = agencies.find((a) => a.id === formData.agencyId);
-      const newUser = {
-        id: `user-${Math.random().toString(36).substring(2, 15)}`,
+      await usersApi.createUser({
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        phone: formData.phone,
+        phone: formData.phone || undefined,
         role: formData.role,
-        permissions: RolePermissions[formData.role],
         agencyId: formData.agencyId || undefined,
-        agency: agency,
-        isActive: true,
-        emailVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      useMockDataStore.setState((state) => ({
-        users: [...state.users, newUser],
-      }));
-
+      });
       onSuccess();
+    } catch {
+      toast.error("Échec de la création de l'utilisateur");
     } finally {
       setLoading(false);
     }
@@ -465,7 +528,7 @@ function CreateUserForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>First Name</Label>
+          <Label>Prénom</Label>
           <Input
             value={formData.firstName}
             onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
@@ -473,7 +536,7 @@ function CreateUserForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Last Name</Label>
+          <Label>Nom</Label>
           <Input
             value={formData.lastName}
             onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
@@ -493,7 +556,7 @@ function CreateUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Password</Label>
+        <Label>Mot de passe</Label>
         <Input
           type="password"
           value={formData.password}
@@ -503,7 +566,7 @@ function CreateUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Phone</Label>
+        <Label>Téléphone</Label>
         <Input
           value={formData.phone}
           onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
@@ -511,7 +574,7 @@ function CreateUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Role</Label>
+        <Label>Rôle</Label>
         <Select
           value={formData.role}
           onValueChange={(v) => setFormData((prev) => ({ ...prev, role: v as Role }))}
@@ -530,15 +593,16 @@ function CreateUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Agency</Label>
+        <Label>Agence</Label>
         <Select
-          value={formData.agencyId}
-          onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v }))}
+          value={formData.agencyId || "none"}
+          onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v === "none" ? "" : v }))}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select agency" />
+            <SelectValue placeholder="Sélectionner une agence" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="none">Aucune</SelectItem>
             {agencies.map((agency) => (
               <SelectItem key={agency.id} value={agency.id}>
                 {agency.name}
@@ -552,10 +616,10 @@ function CreateUserForm({
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating...
+            Création...
           </>
         ) : (
-          "Create User"
+          "Créer l'Utilisateur"
         )}
       </Button>
     </form>
@@ -585,27 +649,16 @@ function EditUserForm({
     setLoading(true);
 
     try {
-      const agency = agencies.find((a) => a.id === formData.agencyId);
-
-      useMockDataStore.setState((state) => ({
-        users: state.users.map((u) =>
-          u.id === user.id
-            ? {
-                ...u,
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                phone: formData.phone,
-                role: formData.role,
-                permissions: RolePermissions[formData.role],
-                agencyId: formData.agencyId || undefined,
-                agency: agency,
-                updatedAt: new Date().toISOString(),
-              }
-            : u
-        ),
-      }));
-
+      await usersApi.updateUser(user.id, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone || undefined,
+        role: formData.role,
+        agencyId: formData.agencyId || null,
+      });
       onSuccess();
+    } catch {
+      toast.error("Échec de la mise à jour de l'utilisateur");
     } finally {
       setLoading(false);
     }
@@ -615,7 +668,7 @@ function EditUserForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>First Name</Label>
+          <Label>Prénom</Label>
           <Input
             value={formData.firstName}
             onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
@@ -623,7 +676,7 @@ function EditUserForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Last Name</Label>
+          <Label>Nom</Label>
           <Input
             value={formData.lastName}
             onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
@@ -633,7 +686,7 @@ function EditUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Phone</Label>
+        <Label>Téléphone</Label>
         <Input
           value={formData.phone}
           onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
@@ -641,7 +694,7 @@ function EditUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Role</Label>
+        <Label>Rôle</Label>
         <Select
           value={formData.role}
           onValueChange={(v) => setFormData((prev) => ({ ...prev, role: v as Role }))}
@@ -660,15 +713,16 @@ function EditUserForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Agency</Label>
+        <Label>Agence</Label>
         <Select
-          value={formData.agencyId}
-          onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v }))}
+          value={formData.agencyId || "none"}
+          onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v === "none" ? "" : v }))}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select agency" />
+            <SelectValue placeholder="Sélectionner une agence" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="none">Aucune</SelectItem>
             {agencies.map((agency) => (
               <SelectItem key={agency.id} value={agency.id}>
                 {agency.name}
@@ -682,10 +736,10 @@ function EditUserForm({
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Saving...
+            Enregistrement...
           </>
         ) : (
-          "Save Changes"
+          "Enregistrer les Modifications"
         )}
       </Button>
     </form>

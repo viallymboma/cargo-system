@@ -11,13 +11,15 @@ export const config = {
    * Set to true to use mock/simulated API (no backend required)
    * Set to false to use real backend API
    */
-  USE_MOCK_API: true,
+  USE_MOCK_API: false,
 
   /**
    * API URLs (used when USE_MOCK_API is false)
+   * Backend runs on port 4000 with /api/v1 prefix
    */
-  API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
-  WS_URL: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000",
+  API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
+  API_PREFIX: "/api/v1",
+  WS_URL: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000",
 
   /**
    * Simulated API delay (ms) - makes mock feel more realistic

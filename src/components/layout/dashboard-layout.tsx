@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -100,10 +100,17 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, hasPermission, logout } = useAuthStore();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotificationStore();
+
+  // Wait for client-side hydration to complete before filtering nav items
+  // This prevents hydration mismatch because auth state comes from localStorage
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     await authApi.logout();
@@ -111,9 +118,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push("/login");
   };
 
-  const filteredNavItems = navItems.filter(
-    (item) => !item.permission || hasPermission(item.permission)
-  );
+  // On server and initial client render, show all nav items
+  // After mount, filter based on permissions
+  const filteredNavItems = mounted
+    ? navItems.filter((item) => !item.permission || hasPermission(item.permission))
+    : navItems;
 
   const userInitials = user
     ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`

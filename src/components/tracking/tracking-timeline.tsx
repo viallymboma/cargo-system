@@ -22,7 +22,6 @@ import {
 const statusIcons: Partial<Record<ShipmentStatus, React.ElementType>> = {
   pending: Clock,
   confirmed: CheckCircle2,
-  picked_up: Package,
   in_warehouse_china: Warehouse,
   in_transit: Plane,
   customs_clearance: Package,
@@ -179,7 +178,6 @@ interface TrackingProgressProps {
 const progressStatuses: ShipmentStatus[] = [
   "pending",
   "confirmed",
-  "picked_up",
   "in_warehouse_china",
   "in_transit",
   "customs_clearance",

@@ -152,12 +152,11 @@ export const useNotificationStore = create<NotificationState>()(
       simulateShipmentUpdate: (trackingNumber, status) => {
         const statusMessages: Record<string, string> = {
           pending: `Shipment ${trackingNumber} has been created`,
-          confirmed: `Shipment ${trackingNumber} has been confirmed and is awaiting pickup`,
-          picked_up: `Shipment ${trackingNumber} has been picked up from sender`,
-          in_warehouse_china: `Shipment ${trackingNumber} has arrived at China warehouse`,
+          confirmed: `Shipment ${trackingNumber} has been received at origin`,
+          in_warehouse_china: `Shipment ${trackingNumber} has arrived at origin warehouse`,
           in_transit: `Shipment ${trackingNumber} is now in transit to Cameroon`,
           customs_clearance: `Shipment ${trackingNumber} is being processed at customs`,
-          in_warehouse_cameroon: `Shipment ${trackingNumber} has arrived at Cameroon warehouse`,
+          in_warehouse_cameroon: `Shipment ${trackingNumber} has arrived at destination warehouse`,
           out_for_delivery: `Shipment ${trackingNumber} is out for delivery`,
           delivered: `Shipment ${trackingNumber} has been delivered successfully!`,
         };
