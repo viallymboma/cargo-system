@@ -17,7 +17,7 @@ export const config = {
    * API URLs (used when USE_MOCK_API is false)
    * Backend runs on port 4000 with /api/v1 prefix
    */
-  API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
+  API_URL: 'https://logistics-management-72pd.onrender.com', // || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
   API_PREFIX: "/api/v1",
   WS_URL: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000",
 
