@@ -1,16 +1,15 @@
 import apiClient, { handleApiError } from "./client";
 import type { Shipment } from "@/types/shipment.types";
 import {
-  toFrontendShipment,
   toBackendCalculateCostDto,
   toFrontendCostResponse,
   type BackendCostResponse,
+  type BackendCalculateCostDto,
   type BackendInvoice,
   type BackendPayment,
   type BackendTariffRule,
   type BackendInvoiceStats,
   type BackendPaymentStats,
-  type BackendRevenueReport,
   type BackendOutstandingPayments,
   type BackendPaymentMethodBreakdown,
   type BackendCreateInvoiceDto,
@@ -190,35 +189,25 @@ export const billingApi = {
   createInvoice: async (data: {
     shipmentId: string;
     clientId: string;
-    description?: string;
-    items: {
-      description: string;
-      quantity: number;
-      unitPrice: number;
-      taxRate?: number;
-    }[];
-    taxes?: number;
-    discounts?: number;
+    subtotal: number;
+    tax?: number;
+    discount?: number;
+    total: number;
     dueDate?: string;
   }): Promise<Invoice> => {
     try {
       const backendData: BackendCreateInvoiceDto = {
         shipmentId: data.shipmentId,
         clientId: data.clientId,
-        description: data.description,
-        items: data.items.map(item => ({
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          taxRate: item.taxRate,
-        })),
-        taxes: data.taxes,
-        discounts: data.discounts,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        discount: data.discount,
+        total: data.total,
         dueDate: data.dueDate,
       };
 
       const response = await apiClient.post<BackendInvoice>("/billing/invoices", backendData);
-      return response.data as Invoice; // TODO: Add proper transformation
+      return response.data as Invoice;
     } catch (error) {
       return handleApiError(error);
     }
@@ -600,5 +589,48 @@ export const billingApi = {
     } catch (error) {
       return handleApiError(error);
     }
+  },
+
+  // ============================================================================
+  // INVOICE GENERATION FROM SHIPMENT
+  // ============================================================================
+
+  /**
+   * Generate an invoice for a shipment: calculates cost from tariffs, then creates the invoice.
+   * Backend: POST /billing/calculate + POST /billing/invoices
+   */
+  generateInvoiceForShipment: async (shipment: Shipment): Promise<Invoice> => {
+    // Step 1: Calculate cost using shipment data
+    // Frontend Shipment stores backend enum values directly (e.g., "CHINA", "CAMEROON")
+    const calcData: BackendCalculateCostDto = {
+      origin: shipment.sender.country as BackendCalculateCostDto["origin"],
+      destination: shipment.receiver.country as BackendCalculateCostDto["destination"],
+      weight: shipment.totalWeight,
+      volume: shipment.volumetricWeight,
+      declaredValue: shipment.declaredValue,
+    };
+
+    const costResponse = await apiClient.post<BackendCostResponse>(
+      "/billing/calculate",
+      calcData
+    );
+
+    const { subtotal, tax, total } = costResponse.data;
+
+    // Step 2: Create invoice with calculated amounts
+    const invoiceData: BackendCreateInvoiceDto = {
+      shipmentId: shipment.id,
+      clientId: shipment.createdById,
+      subtotal,
+      tax,
+      total,
+    };
+
+    const invoiceResponse = await apiClient.post<BackendInvoice>(
+      "/billing/invoices",
+      invoiceData
+    );
+
+    return invoiceResponse.data as Invoice;
   },
 };

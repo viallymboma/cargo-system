@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { shipmentsApi } from "@/lib/api";
+import { shipmentsApi, billingApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,6 +100,7 @@ export default function ShipmentsPage() {
   const [shipmentToDelete, setShipmentToDelete] = useState<string | null>(null);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [generatingBillId, setGeneratingBillId] = useState<string | null>(null);
 
   const loadShipments = useCallback(async () => {
     setLoading(true);
@@ -150,6 +151,18 @@ export default function ShipmentsPage() {
       loadShipments();
     } catch {
       toast.error("Échec de la suppression de l&apos;expédition");
+    }
+  };
+
+  const handleGenerateBill = async (shipment: Shipment) => {
+    setGeneratingBillId(shipment.id);
+    try {
+      await billingApi.generateInvoiceForShipment(shipment);
+      toast.success("Facture générée avec succès");
+    } catch {
+      toast.error("Échec de la génération de la facture");
+    } finally {
+      setGeneratingBillId(null);
     }
   };
 
@@ -315,6 +328,19 @@ export default function ShipmentsPage() {
                             title="Voir les détails"
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGenerateBill(shipment)}
+                            disabled={generatingBillId === shipment.id}
+                            title="Générer la facture"
+                          >
+                            {generatingBillId === shipment.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <FileText className="h-4 w-4 text-green-600" />
+                            )}
                           </Button>
                           <Button
                             variant="ghost"
@@ -659,9 +685,9 @@ function CreateShipmentForm({ onSuccess }: { onSuccess: () => void }) {
               type="number"
               min="0"
               step="0.1"
-              value={formData.totalWeight}
+              value={formData.totalWeight || ""}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, totalWeight: parseFloat(e.target.value) || 0 }))
+                setFormData((prev) => ({ ...prev, totalWeight: e.target.value === "" ? 0 : parseFloat(e.target.value) }))
               }
               required
             />
@@ -671,9 +697,9 @@ function CreateShipmentForm({ onSuccess }: { onSuccess: () => void }) {
             <Input
               type="number"
               min="0"
-              value={formData.declaredValue}
+              value={formData.declaredValue || ""}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, declaredValue: parseFloat(e.target.value) || 0 }))
+                setFormData((prev) => ({ ...prev, declaredValue: e.target.value === "" ? 0 : parseFloat(e.target.value) }))
               }
               required
             />

@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { reportsApi } from "@/lib/api";
+import { toast } from "sonner";
 
 // Define types for report data
 type ShipmentByStatus = {
   status: string;
   count: number;
-  percentage: number;
 };
 
 type ShipmentByOrigin = {
@@ -39,20 +39,42 @@ type RevenueData = {
   pendingAmount: number;
 };
 
+type DashboardStats = {
+  shipments: {
+    total: number;
+    pending: number;
+    inTransit: number;
+    delivered: number;
+  };
+  revenue: {
+    total: number;
+    paid: number;
+    pending: number;
+  };
+};
+
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // State for different report data
-  const [dashboardStats, setDashboardStats] = useState<any>({});
-  const [shipmentsByStatus, setShipmentsByStatus] = useState<
-    ShipmentByStatus[]
-  >([]);
-  const [shipmentsByOrigin, setShipmentsByOrigin] = useState<
-    ShipmentByOrigin[]
-  >([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    shipments: {
+      total: 0,
+      pending: 0,
+      inTransit: 0,
+      delivered: 0,
+    },
+    revenue: {
+      total: 0,
+      paid: 0,
+      pending: 0,
+    }
+  });
+  const [shipmentsByStatus, setShipmentsByStatus] = useState<ShipmentByStatus[]>([]);
+  const [shipmentsByOrigin, setShipmentsByOrigin] = useState<ShipmentByOrigin[]>([]);
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
-  console.log("revenueData", revenueData);
   const [avgDeliveryTime, setAvgDeliveryTime] = useState<number>(0);
 
   useEffect(() => {
@@ -61,6 +83,7 @@ export default function ReportsPage() {
 
   const loadReportsData = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Load all report data
       const [
@@ -83,10 +106,12 @@ export default function ReportsPage() {
       setDashboardStats(dashboardStatsData);
       setShipmentsByStatus(statusData);
       setShipmentsByOrigin(originData);
-      setRevenueData(revenueResponse);
+      setRevenueData(Array.isArray(revenueResponse) ? revenueResponse : [revenueResponse]);
       setAvgDeliveryTime(avgTimeData);
     } catch (error) {
       console.error("Error loading reports data:", error);
+      setError("Erreur lors du chargement des rapports");
+      toast.error("Erreur lors du chargement des rapports");
     } finally {
       setLoading(false);
     }
@@ -104,6 +129,17 @@ export default function ReportsPage() {
     return `${Math.round(days)} jours`;
   };
 
+  // Calculate percentages for shipment status
+  const calculatePercentages = (data: ShipmentByStatus[]) => {
+    const total = data.reduce((sum, item) => sum + item.count, 0);
+    return data.map(item => ({
+      ...item,
+      percentage: total > 0 ? Math.round((item.count / total) * 100) : 0
+    }));
+  };
+
+  const shipmentStatusWithPercentages = calculatePercentages(shipmentsByStatus);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -113,9 +149,9 @@ export default function ReportsPage() {
             Analyse des performances et tendances logistiques
           </p>
         </div>
-        <Button>
+        <Button onClick={loadReportsData}>
           <Download className="mr-2 h-4 w-4" />
-          Exporter
+          Actualiser
         </Button>
       </div>
 
@@ -130,7 +166,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {dashboardStats.total || 0}
+              {dashboardStats.shipments.total || 0}
             </div>
             <p className="text-xs text-gray-500">+12% ce mois-ci</p>
           </CardContent>
@@ -145,7 +181,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {dashboardStats.inTransit || 0}
+              {dashboardStats.shipments.inTransit || 0}
             </div>
             <p className="text-xs text-gray-500">8 arrivent aujourd'hui</p>
           </CardContent>
@@ -160,7 +196,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {dashboardStats.delivered || 0}
+              {dashboardStats.shipments.delivered || 0}
             </div>
             <p className="text-xs text-gray-500">96.4% taux de réussite</p>
           </CardContent>
@@ -175,7 +211,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {formatCurrency(dashboardStats.revenue || 0)}
+              {formatCurrency(dashboardStats.revenue.total || 0)}
             </div>
             <p className="text-xs text-gray-500">+8.2% ce mois-ci</p>
           </CardContent>
@@ -209,16 +245,23 @@ export default function ReportsPage() {
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                   </div>
+                ) : error ? (
+                  <div className="text-center py-8 text-red-500">
+                    <p>Erreur: {error}</p>
+                    <Button onClick={loadReportsData} className="mt-4">
+                      Réessayer
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-4">
-                    {shipmentsByStatus.map((item, index) => (
+                    {shipmentStatusWithPercentages.map((item, index) => (
                       <div key={index} className="space-y-1">
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">
                             {item.status}
                           </span>
                           <span className="text-sm font-medium">
-                            {item.count}
+                            {item.count} ({item.percentage}%)
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -245,6 +288,13 @@ export default function ReportsPage() {
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-8 text-red-500">
+                    <p>Erreur: {error}</p>
+                    <Button onClick={loadReportsData} className="mt-4">
+                      Réessayer
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -276,6 +326,13 @@ export default function ReportsPage() {
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div>
+              ) : error ? (
+                <div className="text-center py-8 text-red-500">
+                  <p>Erreur: {error}</p>
+                  <Button onClick={loadReportsData} className="mt-4">
+                    Réessayer
+                  </Button>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -293,7 +350,7 @@ export default function ReportsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {shipmentsByStatus.map((item, index) => (
+                      {shipmentStatusWithPercentages.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="py-3 px-4 font-medium">
                             {item.status}
@@ -322,6 +379,13 @@ export default function ReportsPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8 text-red-500">
+                  <p>Erreur: {error}</p>
+                  <Button onClick={loadReportsData} className="mt-4">
+                    Réessayer
+                  </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -388,6 +452,13 @@ export default function ReportsPage() {
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-8 text-red-500">
+                    <p>Erreur: {error}</p>
+                    <Button onClick={loadReportsData} className="mt-4">
+                      Réessayer
+                    </Button>
                   </div>
                 ) : (
                   <div className="text-center py-8">

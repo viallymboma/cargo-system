@@ -6,11 +6,17 @@ import {
 
 // Types for reports
 export interface DashboardStats {
-  total: number;
-  pending: number;
-  inTransit: number;
-  delivered: number;
-  revenue: number;
+  shipments: {
+    total: number;
+    pending: number;
+    inTransit: number;
+    delivered: number;
+  };
+  revenue: {
+    total: number;
+    paid: number;
+    pending: number;
+  };
 }
 
 export interface ShipmentByStatus {
@@ -47,13 +53,18 @@ export const reportsApi = {
   getDashboardStats: async (): Promise<DashboardStats> => {
     try {
       const response = await apiClient.get<BackendDashboardResponse>("/reports/dashboard");
-      // Transform the response to match frontend format
       return {
-        total: response.data.shipments.total,
-        pending: response.data.shipments.pending,
-        inTransit: response.data.shipments.inTransit,
-        delivered: response.data.shipments.delivered,
-        revenue: response.data.revenue.total,
+        shipments: {
+          total: response.data.shipments.total,
+          pending: response.data.shipments.pending,
+          inTransit: response.data.shipments.inTransit,
+          delivered: response.data.shipments.delivered,
+        },
+        revenue: {
+          total: response.data.revenue.total,
+          paid: response.data.revenue.paid,
+          pending: response.data.revenue.pending,
+        },
       };
     } catch (error) {
       return handleApiError(error);
@@ -99,8 +110,8 @@ export const reportsApi = {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      const response = await apiClient.get<BackendRevenueReport[]>("/reports/revenue", { params });
-      return response.data;
+      const response = await apiClient.get<BackendRevenueReport | BackendRevenueReport[]>("/reports/revenue", { params });
+      return Array.isArray(response.data) ? response.data : [response.data];
     } catch (error) {
       return handleApiError(error);
     }

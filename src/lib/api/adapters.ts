@@ -971,15 +971,10 @@ export interface BackendPaymentMethodBreakdown {
 export interface BackendCreateInvoiceDto {
   shipmentId: string;
   clientId: string;
-  description?: string;
-  items: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    taxRate?: number;
-  }[];
-  taxes?: number;
-  discounts?: number;
+  subtotal: number;
+  tax?: number;
+  discount?: number;
+  total: number;
   dueDate?: string;
 }
 
